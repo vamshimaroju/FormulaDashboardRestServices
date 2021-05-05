@@ -5,34 +5,25 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
 //To use the @Data annotation you should add the Lombok dependency.
 
 @Entity
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
 public class Status {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private String statusId;
+    private Long statusId;
 
     private String status;
-
-    public String getStatusId() {
-        return statusId;
-    }
-
-    public void setStatusId(String statusId) {
-        this.statusId = statusId;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-
 
 
 }
