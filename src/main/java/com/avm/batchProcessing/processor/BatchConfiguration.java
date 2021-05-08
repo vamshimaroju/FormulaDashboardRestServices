@@ -2,7 +2,9 @@ package com.avm.batchProcessing.processor;
 
 import javax.sql.DataSource;
 
+import com.avm.batchProcessing.vo.RacesBatch;
 import com.avm.batchProcessing.vo.StatusBatch;
+import com.avm.entities.Races;
 import com.avm.entities.Status;
 
 import org.springframework.batch.core.Job;
@@ -26,16 +28,23 @@ import org.springframework.core.io.ClassPathResource;
 @EnableBatchProcessing
 public class BatchConfiguration {
 
-    private final String[] STATUS_FIELD_NAMES = new String[] { "statusId","status" };
-
+    private final String[] STATUS_FIELD_NAMES = new String[] { "statusId", "status" };
+    private final String[] RACES_FIELD_NAMES = new String[] { "raceId", "year", "round", "circuitId", "name", "date",
+            "time", "url" };
     @Autowired
     public JobBuilderFactory jobBuilderFactory;
 
     @Autowired
     public StepBuilderFactory stepBuilderFactory;
 
+    /*
+     *
+     *
+     * Batch process to insert Status data into the tables
+     *
+     */
     @Bean
-    public FlatFileItemReader<StatusBatch> reader() {
+    public FlatFileItemReader<StatusBatch> statusReader() {
         return new FlatFileItemReaderBuilder<StatusBatch>().name("statusReader")
                 .resource(new ClassPathResource("/csv/status.csv")).delimited().names(STATUS_FIELD_NAMES)
                 .fieldSetMapper(new BeanWrapperFieldSetMapper<StatusBatch>() {
@@ -46,33 +55,70 @@ public class BatchConfiguration {
     }
 
     @Bean
-    public StatusProcessor processor() {
+    public StatusProcessor statusProcess() {
         return new StatusProcessor();
     }
 
     @Bean
-    public JdbcBatchItemWriter<Status> writer(DataSource dataSource) {
+    public JdbcBatchItemWriter<Status> statusWriter(DataSource dataSource) {
         return new JdbcBatchItemWriterBuilder<Status>()
                 .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
                 .sql("INSERT INTO status (status_id, status) VALUES (:statusId, :status)").dataSource(dataSource)
                 .build();
     }
 
+    /*
+     * @Bean public Job importStatusJob(JobCompletionNotificationListener listener,
+     * Step statusStep) { return jobBuilderFactory .get("importStatusJob")
+     * .incrementer(new RunIdIncrementer()) .listener(listener)
+     * .flow(statusStep).end().build(); }
+     */
     @Bean
-    public Job importStatusJob(JobCompletionNotificationListener listener, Step statusStep) {
-        return jobBuilderFactory
-                .get("importStatusJob")
-                .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .flow(statusStep).end().build();
+    public Step statusStep(JdbcBatchItemWriter<Status> writer) {
+        return stepBuilderFactory.get("statusStep").<StatusBatch, Status>chunk(10).reader(statusReader())
+                .processor(statusProcess()).writer(writer).build();
+    }
+
+    /*
+     *
+     *
+     * Batch process to insert Races data into the tables
+     *
+     */
+
+    @Bean
+    public FlatFileItemReader<RacesBatch> racesReader() {
+        return new FlatFileItemReaderBuilder<RacesBatch>().name("racesReader")
+                .resource(new ClassPathResource("/csv/races.csv")).delimited().names(RACES_FIELD_NAMES)
+                .fieldSetMapper(new BeanWrapperFieldSetMapper<RacesBatch>() {
+                    {
+                        setTargetType(RacesBatch.class);
+                    }
+                }).build();
     }
 
     @Bean
-    public Step statusStep(JdbcBatchItemWriter<Status> writer) {
-        return stepBuilderFactory
-                .get("statusStep")
-                .<StatusBatch, Status>chunk(10)
-                .reader(reader())
-                .processor(processor()).writer(writer).build();
+    public RaceProcessor raceProcess() {
+        return new RaceProcessor();
+    }
+
+    @Bean
+    public JdbcBatchItemWriter<Races> racesWriter(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<Races>()
+                .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+                .sql("INSERT INTO races (race_id,year,round,circuit_id,name,date,time,url) VALUES (:raceId,:year,:round,:circuitId,:name,:date,:time,:url)")
+                .dataSource(dataSource).build();
+    }
+
+    @Bean
+    public Job importRacesJob(JobCompletionNotificationListener listener, Step racesStep) {
+        return jobBuilderFactory.get("importRacesJob").incrementer(new RunIdIncrementer()).listener(listener)
+                .flow(racesStep).end().build();
+    }
+
+    @Bean
+    public Step racesStep(JdbcBatchItemWriter<Races> writer) {
+        return stepBuilderFactory.get("racesStep").<RacesBatch, Races>chunk(10).reader(racesReader())
+                .processor(raceProcess()).writer(writer).build();
     }
 }
