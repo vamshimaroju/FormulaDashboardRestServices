@@ -3,8 +3,10 @@ package com.avm.batchProcessing.processor;
 import javax.sql.DataSource;
 
 import com.avm.batchProcessing.vo.RacesBatch;
+import com.avm.batchProcessing.vo.SeasonsBatch;
 import com.avm.batchProcessing.vo.StatusBatch;
 import com.avm.entities.Races;
+import com.avm.entities.Seasons;
 import com.avm.entities.Status;
 
 import org.springframework.batch.core.Job;
@@ -31,6 +33,8 @@ public class BatchConfiguration {
     private final String[] STATUS_FIELD_NAMES = new String[] { "statusId", "status" };
     private final String[] RACES_FIELD_NAMES = new String[] { "raceId", "year", "round", "circuitId", "name", "date",
             "time", "url" };
+    private final String[] SEASONS_FIELD_NAMES = new String[]{"year","url"};
+
     @Autowired
     public JobBuilderFactory jobBuilderFactory;
 
@@ -110,15 +114,58 @@ public class BatchConfiguration {
                 .dataSource(dataSource).build();
     }
 
-    @Bean
+/*     @Bean
     public Job importRacesJob(JobCompletionNotificationListener listener, Step racesStep) {
         return jobBuilderFactory.get("importRacesJob").incrementer(new RunIdIncrementer()).listener(listener)
                 .flow(racesStep).end().build();
     }
-
+ */
     @Bean
     public Step racesStep(JdbcBatchItemWriter<Races> writer) {
         return stepBuilderFactory.get("racesStep").<RacesBatch, Races>chunk(10).reader(racesReader())
                 .processor(raceProcess()).writer(writer).build();
+    }
+
+    /*
+     *
+     *
+     * Batch process to insert Seasons data into the tables
+     *
+     */
+
+    @Bean
+    public FlatFileItemReader<SeasonsBatch> seasonsReader() {
+        return new FlatFileItemReaderBuilder<SeasonsBatch>().name("seasonsReader")
+                .resource(new ClassPathResource("/csv/seasons.csv")).delimited().names(SEASONS_FIELD_NAMES)
+                .fieldSetMapper(new BeanWrapperFieldSetMapper<SeasonsBatch>() {
+                    {
+                        setTargetType(SeasonsBatch.class);
+                    }
+                }).build();
+    }
+
+    @Bean
+    public SeasonsProcessor seasonsProcess() {
+        return new SeasonsProcessor();
+    }
+
+    @Bean
+    public JdbcBatchItemWriter<Seasons> seasonsWriter(DataSource dataSource) {
+        return new JdbcBatchItemWriterBuilder<Seasons>()
+                .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+                .sql("INSERT INTO seasons (year,url ) values (:year,:url)")
+                .dataSource(dataSource).build();
+    }
+
+/*     @Bean
+    public Job importSeasonsJob(JobCompletionNotificationListener listener, Step seasonsStep) {
+        return jobBuilderFactory.get("importSeasonsJob").incrementer(new RunIdIncrementer()).listener(listener)
+                .flow(seasonsStep).end().build();
+    }
+ */
+    @Bean
+    public Step seasonsStep(JdbcBatchItemWriter<Seasons> writer) {
+        return stepBuilderFactory.get("seasonsStep").<SeasonsBatch, Seasons>chunk(10).reader(seasonsReader())
+                .processor(seasonsProcess()).writer(writer).build();
     }
 }
